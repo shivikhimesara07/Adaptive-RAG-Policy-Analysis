@@ -1,29 +1,9 @@
 """
-Evaluation harness for the grounding critic.
-
-The first version of this harness corrupted quotes by swapping or
-deleting a word, then checked whether an exact-substring critic caught
-it. That's not a real test: a single-word change is GUARANTEED to break
-an exact substring match, and a clean quote is GUARANTEED to pass one.
-100%/0% wasn't a finding, it was an artifact of testing a deterministic
-check against a corruption method that can only ever produce one outcome.
-
-This version tests something the critic can actually get wrong:
-extracting a quote that is 100% verbatim - genuinely present in the
-source text - but is the WRONG clause, i.e. real text that doesn't
-support the value being claimed. This is the realistic LLM failure mode
-(anchoring on a plausible-looking but incorrect sentence) that a
-verbatim-only check misses and a value-grounded check catches.
 
 Three trial types:
-  CLEAN        - correct quote, correct value. Critic should pass it.
-  WRONG_CLAUSE - a real, verbatim sentence from elsewhere in the SAME
-                 document, swapped in as the quote. Verbatim-only
-                 checking would wrongly pass this; value-grounded
-                 checking should catch it.
-  WORD_EDIT    - a genuinely paraphrased quote (word swapped). Included
-                 for completeness, but reported separately since it's
-                 the easy case both check types will always catch.
+  CLEAN: correct quote, correct value. Critic should pass it.
+  WRONG_CLAUSE: a real sentence from elsewhere in the same document, swapped in as quote. Verbatim-only checking would wrongly pass this; value-grounded checking should catch it.
+  WORD_EDIT : a genuinely paraphrased quote (word swapped). Included for completeness, but reported separately since it's the easy case both check types will always catch.
 """
 
 import random
@@ -33,16 +13,15 @@ from corpus import changed_pairs, get_chunk
 from policy_diff import _fallback_rule_based_extraction, verify_grounding
 
 _WORD_SUBS = {
-    "maximum": "upper limit",
+    "maximum":"upper limit",
     "visits": "sessions",
-    "exceeding": "above",
-    "reimbursed": "paid",
-    "contracted": "agreed",
+    "exceeding":  "above",
+    "reimbursed":"paid",
+    "contracted" : "agreed",
 }
 
-
 def _split_sentences(text: str) -> list:
-    sentences = []
+    sentences=[]
     for para in re.split(r"\n\s*\n", text.strip()):
         for s in re.split(r"(?<=[.])\s+", para.replace("\n", " ").strip()):
             s = s.strip()
@@ -65,11 +44,7 @@ def _word_edit(quote: str) -> str:
 
 
 def _wrong_clause(correct_quote: str, source_text: str, claimed_value, rng: random.Random):
-    """
-    Finds a different, real sentence from the same source document that
-    does NOT contain the claimed value - a verbatim quote attached to the
-    wrong clause. Returns None if no such alternate sentence exists.
-    """
+
     candidates = [
         s for s in _split_sentences(source_text)
         if s != correct_quote and (claimed_value is None or str(claimed_value) not in s)
@@ -108,11 +83,6 @@ def run_eval(n_trials: int = 200, seed: int = 42) -> dict:
                 trial_type = "CLEAN"
             else:
                 change[side] = swap
-                # Segment by whether this change even has a numeric value
-                # to check - the critic's value-grounding check literally
-                # cannot fire on a qualitative change with no value, so
-                # lumping these together would hide that this is a known,
-                # structural gap rather than an inconsistent one.
                 trial_type = "WRONG_CLAUSE_QUANT" if claimed_value is not None else "WRONG_CLAUSE_QUAL"
 
         elif trial_type == "WORD_EDIT":
@@ -149,11 +119,11 @@ def run_eval(n_trials: int = 200, seed: int = 42) -> dict:
 if __name__ == "__main__":
     r = run_eval()
     print(f"Trials: {r['n_trials']}")
-    print(f"False-positive rate on clean quotes: {r['false_positive_rate']}% "
+    print(f"False positive rate on clean quotes: {r['false_positive_rate']}% "
           f"({r['clean_false_flagged']}/{r['clean_total']})")
-    print(f"Catch rate, wrong-clause / quantifiable changes: {r['wrong_clause_quant_catch_rate']}% "
+    print(f"Catch rate, wrong-clause/ quantifiable changes: {r['wrong_clause_quant_catch_rate']}% "
           f"({r['wrong_clause_quant_caught']}/{r['wrong_clause_quant_total']})")
-    print(f"Catch rate, wrong-clause / qualitative changes: {r['wrong_clause_qual_catch_rate']}% "
+    print(f"Catch rate, wrong-clause /qualitative changes: {r['wrong_clause_qual_catch_rate']}% "
           f"({r['wrong_clause_qual_caught']}/{r['wrong_clause_qual_total']})  <- known gap, no value to check")
     print(f"Catch rate, paraphrased quotes: {r['word_edit_catch_rate']}% "
           f"({r['word_edit_caught']}/{r['word_edit_total']})")
