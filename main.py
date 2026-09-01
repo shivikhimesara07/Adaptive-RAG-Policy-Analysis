@@ -1,24 +1,3 @@
-"""
-Policy Impact Simulator - full pipeline demo
-
-Runs three example queries of increasing complexity through the adaptive
-router, showing each one take a genuinely different retrieval path:
-
-  1. SIMPLE    - single-fact lookup -> vector search only
-  2. MULTI_HOP - relationship question -> vector search + 2-hop graph walk
-  3. COMPLEX   - cross-document synthesis -> vector search + multi-hop
-                 over all matches, handed to the agentic draft/critique/
-                 retry loop, then simulated for financial impact
-
-Then runs the critic evaluation harness to report its actual catch rate
-on corrupted (simulated-hallucination) extractions.
-
-Run:
-  pip install -r requirements.txt
-  export GEMINI_API_KEY=your_key_here   # optional - offline fallback works without it
-  python main.py
-"""
-
 from agentic_loop import run_agentic_synthesis
 from corpus import get_chunk
 from eval_harness import run_eval
@@ -38,7 +17,6 @@ def header(text):
 
 
 def run_simulation_for_change(change: dict, episodes, imaging_claims):
-    """Dispatches a verified change to the matching simulator by change_type."""
     ctype = change.get("change_type")
     old_v, new_v = change.get("old_value"), change.get("new_value")
     if old_v is None or new_v is None:
@@ -116,13 +94,6 @@ def main():
     print(f"  Catch rate, paraphrased quotes: "
           f"{eval_results['word_edit_catch_rate']}% "
           f"({eval_results['word_edit_caught']}/{eval_results['word_edit_total']})")
-
-    print("\n" + "=" * 72)
-    print("Every number above traces back to a specific retrieval path,")
-    print("a verified (or abstained) extraction, and a synthetic population -")
-    print("nothing here is asserted without a chunk_id or a re-runnable trial.")
-    print("=" * 72 + "\n")
-
 
 if __name__ == "__main__":
     main()
