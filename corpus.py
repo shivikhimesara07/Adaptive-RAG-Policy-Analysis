@@ -1,22 +1,7 @@
-"""
-Multi-policy corpus with explicit cross-references between sections and
-between documents. This is what makes vector search and knowledge-graph
-multi-hop retrieval meaningful instead of decorative: there are genuinely
-multiple documents, multiple sections, and real "see Section X" links to
-traverse.
-
-All text is synthetic / written for this demo. No real payer or CMS policy
-language, no PHI.
-"""
-
-# Each "chunk" is one retrievable unit: a (doc, section) pair, versioned.
-# `refs` lists other chunk_ids this chunk explicitly cross-references in its
-# text - these become edges in the knowledge graph.
-
 CORPUS = {
-    # ---------------------------------------------------------------
-    # Document 1: Outpatient Physical Therapy Coverage Policy
-    # ---------------------------------------------------------------
+  
+    # Doc1: Outpatient Physical Therapy Coverage Policy
+
     "pt_4.1_v1": {
         "doc": "Outpatient PT Coverage Policy",
         "section": "4.1 Overview",
@@ -124,9 +109,7 @@ CORPUS = {
         ),
         "refs": ["pt_4.2_v2"],
     },
-    # ---------------------------------------------------------------
     # Document 2: Diagnostic Imaging Prior-Authorization Policy
-    # ---------------------------------------------------------------
     "img_2.1_v1": {
         "doc": "Diagnostic Imaging Prior-Authorization Policy",
         "section": "2.1 Overview",
@@ -197,10 +180,8 @@ CORPUS = {
         ),
         "refs": [],
     },
-    # ---------------------------------------------------------------
     # Document 3: Utilization Management Program Overview (hub doc -
-    # this is what makes cross-document multi-hop retrieval real)
-    # ---------------------------------------------------------------
+   
     "um_1.1_v1": {
         "doc": "Utilization Management Program Overview",
         "section": "1.1 Program Scope",
