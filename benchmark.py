@@ -1,54 +1,30 @@
-"""
-Benchmark: adaptive routing vs. a naive baseline that always runs the
-most expensive retrieval + synthesis path, regardless of query
-complexity.
-
-  ADAPTIVE - the real router: SIMPLE gets vector-only (top-1), MULTI_HOP
-             gets a 1-hop graph walk, COMPLEX gets vector top-k + 2-hop
-             walk + the full agentic draft/critique/retry synthesis.
-  NAIVE    - runs the COMPLEX-tier strategy in full - including agentic
-             synthesis - for EVERY query, which is what a pipeline
-             without complexity-aware routing would do.
-
-This is the actual evidence for "adaptive routing" as an efficiency
-claim: how much retrieval volume and wall-clock time does matching
-effort to query complexity actually save, on a representative batch of
-queries spanning all three tiers?
-
-Run: python benchmark.py
-"""
-
 import time
 
 from agentic_loop import run_agentic_synthesis
 from router import AdaptiveRouter, classify_query
 
 TEST_QUERIES = [
-    # SIMPLE - single-fact lookups
+    #  single-fact lookups
     "What is the maximum number of PT visits allowed per episode of care?",
     "What is the diagnostic imaging prior-authorization dollar threshold?",
     "What percentage rate is used for out-of-network imaging reimbursement?",
     "What is the reimbursement rate for physical therapy visits?",
     "What is the physician attestation requirement in the PT policy?",
     "What is the effective date of the imaging reimbursement policy?",
-    # MULTI_HOP - relationship questions between two clauses
+    # relationship questions between two clauses (multi-hop)
     "How does the change in the PT visit maximum affect prior authorization requirements?",
     "How does the imaging authorization threshold relate to the utilization management program?",
     "How does the PT visit limit affect the physician attestation requirement?",
     "How does the reimbursement rate change relate to out-of-network imaging claims?",
     "How does the visit limit change affect the reimbursement rate section?",
-    # COMPLEX - cross-document synthesis
-    "Summarize all changes across all utilization management policies and quantify their financial impact.",
+    # cross-document synthesis
+    "summarize all changes across all utilization management policies and quantify their financial impact.",
     "Summarize every policy change and its downstream financial impact across all documents.",
 ]
 
-N_REPEATS = 20  # repeated timing per query for a stable average, not a single noisy sample
-
+N_REPEATS = 20
 
 def naive_full_pipeline(router: AdaptiveRouter, query: str) -> dict:
-    """Always does the COMPLEX-tier amount of work: broad retrieval,
-    2-hop graph walk, AND full agentic draft/critique/retry synthesis -
-    regardless of what the query actually needs."""
     hits = router.vector_store.search(query, top_k=3)
     seed_ids = [cid for cid, _ in hits]
     hop_results = router.graph.multi_hop(seed_ids, hops=2)
@@ -59,8 +35,6 @@ def naive_full_pipeline(router: AdaptiveRouter, query: str) -> dict:
 
 
 def adaptive_full_pipeline(router: AdaptiveRouter, query: str) -> dict:
-    """The real router - only pays for agentic synthesis when the query
-    is actually classified as needing cross-document synthesis."""
     result = router.route(query)
     if result["tier"] == "COMPLEX":
         result["changes"] = run_agentic_synthesis(result["chunk_ids"])
@@ -75,7 +49,6 @@ def time_call(fn, n=N_REPEATS):
         result = fn()
     elapsed_ms = (time.perf_counter() - start) / n * 1000
     return elapsed_ms, result
-
 
 def run_benchmark():
     router = AdaptiveRouter()
@@ -94,7 +67,6 @@ def run_benchmark():
         })
     return rows
 
-
 def summarize(rows):
     by_tier = {}
     for r in rows:
@@ -111,8 +83,8 @@ def summarize(rows):
         if not group:
             continue
         n = len(group)
-        avg_a_ms = sum(r["adaptive_ms"] for r in group) / n
-        avg_n_ms = sum(r["naive_ms"] for r in group) / n
+        avg_a_ms= sum(r["adaptive_ms"] for r in group) / n
+        avg_n_ms =sum(r["naive_ms"] for r in group) / n
         avg_a_chunks = sum(r["adaptive_chunks"] for r in group) / n
         avg_n_chunks = sum(r["naive_chunks"] for r in group) / n
         time_saved = 100 * (1 - avg_a_ms / avg_n_ms) if avg_n_ms else 0
@@ -134,24 +106,6 @@ def summarize(rows):
     print(f"  Naive avg latency:    {total_naive_ms/n_total:.4f} ms/query")
     print(f"  End-to-end latency reduction: {overall_time_saved:.1f}%")
     print(f"  Retrieval volume reduction:   {overall_chunks_saved:.1f}%")
-
-    print(
-        "\nCaveats, stated plainly rather than left for someone else to find:\n"
-        "  - COMPLEX-tier queries show ~0% chunk savings and noisy/negative timing -\n"
-        "    that's expected and correct, not a bug: a query correctly classified as\n"
-        "    COMPLEX SHOULD run the full pipeline, so there's nothing to save there.\n"
-        "    All the real savings come from SIMPLE and MULTI_HOP queries, where\n"
-        "    routing avoids paying for synthesis they don't need.\n"
-        "  - The rule-based classifier is coarser than its 3-tier name implies: several\n"
-        "    queries intended as single-fact lookups get classified MULTI_HOP because\n"
-        "    they happen to mention 2+ topic keywords (e.g. 'imaging' + 'threshold').\n"
-        "    That's a real precision limit worth disclosing, not a scripted result.\n"
-        "  - Absolute latencies here are sub-millisecond because this is in-memory\n"
-        "    Python over a 14-chunk corpus with no network or LLM calls in the timed\n"
-        "    path. The percentage reduction is the meaningful number - it demonstrates\n"
-        "    the mechanism, not a production latency claim."
-    )
-
 
 if __name__ == "__main__":
     rows = run_benchmark()
