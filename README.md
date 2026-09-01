@@ -1,7 +1,5 @@
 # Adaptive-Multi-Strategy-RAG-for-Policy-Impact-Analysis
 
-# Policy Impact Simulator
-
 A prototype for analyzing healthcare policy changes and estimating their financial impact using an adaptive retrieval pipeline.
 
 ### How it works
