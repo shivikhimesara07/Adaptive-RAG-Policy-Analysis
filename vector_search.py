@@ -1,13 +1,3 @@
-"""
-Lightweight vector search over the policy corpus.
-
-Implements TF-IDF vectorization + cosine similarity in pure Python (no
-external ML dependency), consistent with the rest of this repo's
-"runs fully offline, no API key required" design. This is a real sparse
-vector space, not a keyword grep: term weights are learned from the
-corpus, and ranking is by cosine similarity in that vector space.
-"""
-
 import math
 import re
 from collections import Counter
@@ -25,11 +15,7 @@ class VectorStore:
     def __init__(self, chunks: dict = None):
         self.chunks = chunks or all_chunks()
         self.chunk_ids = list(self.chunks.keys())
-        # Index doc name + section heading alongside body text. Section
-        # headings ("4.2 Visit Limits") carry a lot of the real topical
-        # signal - indexing body text alone lets a coincidental phrase
-        # match in the wrong section outscore the section that's actually
-        # about the query's topic.
+    
         self._doc_tokens = {
             cid: _tokenize(f"{c['doc']} {c['section']} {c['text']} {c['text']}")
             for cid, c in self.chunks.items()
@@ -72,10 +58,6 @@ class VectorStore:
         return dot / (norm1 * norm2)
 
     def search(self, query: str, top_k: int = 3, version: str = None) -> list:
-        """
-        Returns [(chunk_id, score), ...] sorted by cosine similarity,
-        descending. Optionally restrict to one policy version ("v1"/"v2").
-        """
         q_vec = self._tfidf_vector(_tokenize(query))
         scored = []
         for cid in self.chunk_ids:
