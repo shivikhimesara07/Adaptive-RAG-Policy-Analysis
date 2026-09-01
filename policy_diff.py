@@ -1,10 +1,3 @@
-"""
-Structured-change extraction + grounding critic, generalized to work over
-ANY changed (v1, v2) clause pair the router hands it - visit caps, dollar
-thresholds, and percentage rates - not just the single hardcoded PT
-visit-cap case from the original hackathon POC.
-"""
-
 import json
 import os
 import re
@@ -17,7 +10,8 @@ significant substantive change between them.
 
 Respond with ONLY a JSON object (no markdown fences, no commentary) with these fields:
 {
-  "field_changed": short label for what changed,
+  "field_changed": 
+  short label for what changed,
   "change_type": one of "visit_cap", "dollar_threshold", "percentage_rate", "other",
   "old_value": the old numeric value (number only, no symbols),
   "new_value": the new numeric value (number only, no symbols),
@@ -26,28 +20,18 @@ Respond with ONLY a JSON object (no markdown fences, no commentary) with these f
   "quoted_clause_v2": the exact sentence from v2 that states the new value (verbatim, no edits)
 }
 """
-
-# (regex pattern, change_type, field label) - checked in order.
 _VALUE_PATTERNS = [
     (r"maximum of (\d+) visits", "visit_cap", "Visit cap"),
     (r"exceeding \$([\d,]+)", "dollar_threshold", "Prior-auth dollar threshold"),
     (r"reimbursed at (\d+)% of", "percentage_rate", "Reimbursement rate"),
 ]
 
-
 def extract_structured_change(v1_chunk: dict, v2_chunk: dict) -> dict:
-    """
-    v1_chunk / v2_chunk are corpus entries (dicts with "text", "section",
-    "doc", "effective_date"). Tries Gemini first if a key is set, falls
-    back to the rule-based extractor otherwise - same offline-first design
-    as the original POC, generalized across change types.
-    """
     if os.environ.get("GEMINI_API_KEY"):
         try:
             return _extract_with_gemini(v1_chunk["text"], v2_chunk["text"])
         except Exception as e:
             print(f"[warn] Gemini extraction failed ({e}); using rule-based fallback.")
-
     return _fallback_rule_based_extraction(v1_chunk, v2_chunk)
 
 
@@ -107,15 +91,14 @@ def _fallback_rule_based_extraction(v1_chunk: dict, v2_chunk: dict) -> dict:
 
 def verify_grounding(change: dict, v1_text: str, v2_text: str) -> dict:
     """
-    Critic step, with two independent checks - both must pass:
+    Critic step, with two types of independent checks and both of them must pass:
 
     1. Quote-verbatim: does the quoted clause actually appear
-       (near-verbatim, whitespace/case-normalized) in the source text?
+       (near-verbatim,whitespace/case-normalized) in source text?
        Catches an extractor paraphrasing instead of copying.
-
     2. Value-grounded: does the quoted clause actually CONTAIN the
        old_value/new_value being claimed? A quote can be 100% verbatim -
-       genuinely present in the source - while being the WRONG clause,
+       genuinely present in the source, while being the wrong clause,
        i.e. real text that doesn't support the number attached to it.
        Checking verbatim-presence alone misses this; this is the failure
        mode that actually matters for a financial extraction.
@@ -132,15 +115,13 @@ def verify_grounding(change: dict, v1_text: str, v2_text: str) -> dict:
 
     old_val, new_val = change.get("old_value"), change.get("new_value")
     if old_val is not None and new_val is not None:
-        # Strip currency/thousands formatting before comparing - "1500"
-        # must match "$1,500" in the source text, not just a bare "1500".
+      
         q1_digits = re.sub(r"[^0-9.]", "", q1_norm)
         q2_digits = re.sub(r"[^0-9.]", "", q2_norm)
         value_grounded_v1 = str(old_val) in q1_norm or str(old_val) in q1_digits
         value_grounded_v2 = str(new_val) in q2_norm or str(new_val) in q2_digits
     else:
-        # Qualitative changes have no numeric value to check - value
-        # grounding doesn't apply, so it can't fail this check.
+     
         value_grounded_v1 = value_grounded_v2 = True
 
     fully_grounded = grounded_v1 and grounded_v2 and value_grounded_v1 and value_grounded_v2
