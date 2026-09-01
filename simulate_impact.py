@@ -1,19 +1,3 @@
-"""
-Applies an extracted policy change to a synthetic claims population and
-computes the financial/operational impact - the "so what" number a
-payment-integrity team would want before a policy change goes live.
-
-Three change types are handled, matching the three patterns the
-extraction layer recognizes:
-  - visit_cap:        PT visit-cap tightening/loosening
-  - dollar_threshold:  prior-authorization dollar threshold changes
-  - percentage_rate:   reimbursement percentage changes
-
-Each returns a common shape (total items, items affected, dollar delta)
-so a caller can aggregate across change types without special-casing.
-"""
-
-
 def simulate_visit_cap_change(episodes: list, old_cap: int, new_cap: int) -> dict:
     total_old_paid = total_new_paid = 0.0
     affected = []
@@ -35,12 +19,6 @@ def simulate_visit_cap_change(episodes: list, old_cap: int, new_cap: int) -> dic
 
 
 def simulate_dollar_threshold_change(claims: list, old_threshold: float, new_threshold: float) -> dict:
-    """
-    A lower threshold means more claims newly require prior authorization.
-    Impact metric: total contracted-cost dollars that move from
-    "no auth required" to "auth required" - i.e. dollars now subject to
-    utilization review that weren't before.
-    """
     newly_requires_auth = []
     for c in claims:
         cost = c["contracted_cost"]
@@ -59,13 +37,7 @@ def simulate_dollar_threshold_change(claims: list, old_threshold: float, new_thr
     return _summarize("dollar_threshold", len(claims), newly_requires_auth, total_old, total_new,
                        delta_label="dollars newly subject to prior authorization")
 
-
 def simulate_percentage_rate_change(claims: list, old_pct: float, new_pct: float) -> dict:
-    """
-    Applies to out-of-network claims only (per the imaging policy's
-    reimbursement-terms clause). Impact metric: change in total
-    reimbursement paid out.
-    """
     oon_claims = [c for c in claims if c["network_status"] == "out_of_network"]
     affected = []
     total_old_paid = total_new_paid = 0.0
